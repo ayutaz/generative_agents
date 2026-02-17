@@ -29,6 +29,13 @@ analysis = [
     "scikit-posthocs>=0.7,<1.0",
     "trueskill>=0.4,<1.0",
 ]
+test = [
+    "pytest>=7.4,<9.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
 
 [tool.uv]
 # アプリケーションプロジェクト（ライブラリではない）のため、自身のビルド・インストールは不要

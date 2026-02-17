@@ -1,0 +1,12 @@
+{
+  "the_ville": {
+    "isabella_house": {
+      "main_room": ["easel", "canvas", "paint_set"],
+      "kitchen": ["stove", "fridge", "sink"]
+    },
+    "town_square": {
+      "plaza": ["fountain", "bench"],
+      "cafe": ["coffee_machine", "table", "chair"]
+    }
+  }
+}
