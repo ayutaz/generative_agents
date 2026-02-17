@@ -370,12 +370,19 @@ def run_gpt_prompt_task_decomp(persona,
         _cr += [" ".join([j.strip () for j in i.split(" ")][3:])]
       else: 
         _cr += [i]
-    for count, i in enumerate(_cr): 
+    for count, i in enumerate(_cr):
+      if "(duration in minutes:" not in i:
+        continue
       k = [j.strip() for j in i.split("(duration in minutes:")]
       task = k[0]
-      if task[-1] == ".": 
+      if not task:
+        continue
+      if task[-1] == ".":
         task = task[:-1]
-      duration = int(k[1].split(",")[0].strip())
+      try:
+        duration = int(k[1].split(",")[0].strip())
+      except (IndexError, ValueError):
+        continue
       cr += [[task, duration]]
 
     total_expected_min = int(prompt.split("(total duration in minutes")[-1]
@@ -413,14 +420,14 @@ def run_gpt_prompt_task_decomp(persona,
 
     return cr
 
-  def __func_validate(gpt_response, prompt=""): 
-    # TODO -- this sometimes generates error 
-    try: 
-      __func_clean_up(gpt_response)
-    except: 
-      pass
-      # return False
-    return gpt_response
+  def __func_validate(gpt_response, prompt=""):
+    try:
+      result = __func_clean_up(gpt_response, prompt=prompt)
+      if result and len(result) > 0:
+        return True
+      return False
+    except:
+      return False
 
   def get_fail_safe(): 
     fs = ["asleep"]
@@ -836,8 +843,9 @@ def run_gpt_prompt_pronunciatio(action_description, persona, verbose=False):
   fail_safe = get_fail_safe()
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
+  if output != False:
     return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  return fail_safe, [fail_safe, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -1012,8 +1020,9 @@ def run_gpt_prompt_act_obj_desc(act_game_object, act_desp, persona, verbose=Fals
   fail_safe = get_fail_safe(act_game_object) ########
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
+  if output != False:
     return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  return fail_safe, [fail_safe, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -1637,8 +1646,9 @@ def run_gpt_prompt_summarize_conversation(persona, conversation, test_input=None
   fail_safe = get_fail_safe() ########
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
+  if output != False:
     return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  return fail_safe, [fail_safe, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -1890,8 +1900,9 @@ def run_gpt_prompt_event_poignancy(persona, event_description, test_input=None, 
   fail_safe = get_fail_safe() ########
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
+  if output != False:
     return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  return fail_safe, [fail_safe, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -1961,8 +1972,9 @@ def run_gpt_prompt_thought_poignancy(persona, event_description, test_input=None
   fail_safe = get_fail_safe() ########
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
+  if output != False:
     return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  return fail_safe, [fail_safe, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -2033,8 +2045,9 @@ def run_gpt_prompt_chat_poignancy(persona, event_description, test_input=None, v
   fail_safe = get_fail_safe() ########
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
+  if output != False:
     return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  return fail_safe, [fail_safe, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -2109,8 +2122,9 @@ def run_gpt_prompt_focal_pt(persona, statements, n, test_input=None, verbose=Fal
   fail_safe = get_fail_safe(n) ########
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
+  if output != False:
     return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  return fail_safe, [fail_safe, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -2236,8 +2250,9 @@ def run_gpt_prompt_agent_chat_summarize_ideas(persona, target_persona, statement
   fail_safe = get_fail_safe() ########
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
+  if output != False:
     return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  return fail_safe, [fail_safe, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -2304,8 +2319,9 @@ def run_gpt_prompt_agent_chat_summarize_relationship(persona, target_persona, st
   fail_safe = get_fail_safe() ########
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
+  if output != False:
     return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  return fail_safe, [fail_safe, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -2513,8 +2529,9 @@ def run_gpt_prompt_summarize_ideas(persona, statements, question, test_input=Non
   fail_safe = get_fail_safe() ########
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
+  if output != False:
     return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  return fail_safe, [fail_safe, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
 
@@ -2732,8 +2749,9 @@ def run_gpt_prompt_memo_on_convo(persona, all_utt, test_input=None, verbose=Fals
   fail_safe = get_fail_safe() ########
   output = ChatGPT_safe_generate_response(prompt, example_output, special_instruction, 3, fail_safe,
                                           __chat_func_validate, __chat_func_clean_up, True)
-  if output != False: 
+  if output != False:
     return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+  return fail_safe, [fail_safe, prompt, gpt_param, prompt_input, fail_safe]
   # ChatGPT Plugin ===========================================================
 
   gpt_param = {"engine": "gpt-4o-mini", "max_tokens": 50, 
