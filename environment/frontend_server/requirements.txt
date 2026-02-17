@@ -1,3 +1,5 @@
+# Herokuデプロイ専用 — ローカル開発には使用しないこと。
+# ローカル開発には: uv sync
 aiohttp==3.8.3
 aiosignal==1.3.1
 asgiref==3.5.2

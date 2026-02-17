@@ -83,7 +83,7 @@ target/
 .ipynb_checkpoints
 
 # pyenv
-.python-version
+# .python-version  # uvが使用するため追跡対象
 
 # celery beat schedule file
 celerybeat-schedule
@@ -93,6 +93,7 @@ celerybeat-schedule
 
 # virtualenv
 venv/
+.venv/
 ENV/
 
 # Spyder project settings
