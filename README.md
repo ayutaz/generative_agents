@@ -16,8 +16,6 @@
 ```
 # OpenAI APIキーをコピー＆ペーストしてください
 openai_api_key = "<Your OpenAI API>"
-# あなたの名前を入力してください
-key_owner = "<Name>"
 
 maze_assets_loc = "../../environment/frontend_server/static_dirs/assets"
 env_matrix = f"{maze_assets_loc}/the_ville/matrix"
@@ -31,7 +29,7 @@ collision_block_id = "32125"
 # 詳細ログ出力
 debug = True
 ```
-`<Your OpenAI API>`をご自身のOpenAI APIキーに、`<Name>`をご自身の名前に置き換えてください。
+`<Your OpenAI API>`をご自身のOpenAI APIキーに置き換えてください。
 
 ### Step 2. パッケージのインストール
 Python 3.9.12で動作確認済みです。

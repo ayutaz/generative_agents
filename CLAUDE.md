@@ -16,18 +16,24 @@ uv sync --extra analysis   # 分析用パッケージも含める
 uv sync --extra test       # テスト用パッケージも含める
 ```
 
-APIキー設定ファイルは手動作成が必要（.gitignore対象）:
-```python
-# reverie/backend_server/utils.py
-openai_api_key = "<Your OpenAI API>"
-key_owner = "<Your Name>"
-maze_assets_loc = "../../environment/frontend_server/static_dirs/assets"
-env_matrix = f"{maze_assets_loc}/the_ville/matrix"
-env_visuals = f"{maze_assets_loc}/the_ville/visuals"
-fs_storage = "../../environment/frontend_server/storage"
-fs_temp_storage = "../../environment/frontend_server/temp_storage"
-collision_block_id = "32125"
-debug = True
+APIキー設定は`.env`ファイルで管理（`.gitignore`対象）。`.env.example`をコピーして設定:
+```bash
+cp .env.example .env
+# .envを編集してAPIキーを設定
+```
+
+`.env`の必須項目:
+```
+OPENAI_API_KEY=<your-openai-api-key>
+```
+
+オプション項目（デフォルト値あり）:
+```
+MAZE_ASSETS_LOC=../../environment/frontend_server/static_dirs/assets
+FS_STORAGE=../../environment/frontend_server/storage
+FS_TEMP_STORAGE=../../environment/frontend_server/temp_storage
+COLLISION_BLOCK_ID=32125
+DEBUG=true
 ```
 
 ## サーバー起動

@@ -23,7 +23,6 @@ if _BACKEND not in sys.path:
 # ---------------------------------------------------------------------------
 _utils_stub = types.ModuleType("utils")
 _utils_stub.openai_api_key = "test-key"
-_utils_stub.key_owner = "test-owner"
 _utils_stub.maze_assets_loc = ""
 _utils_stub.env_matrix = ""
 _utils_stub.env_visuals = ""
