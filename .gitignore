@@ -107,3 +107,11 @@ ENV/
 
 # Claude Code
 .claude/
+
+# Benchmark / simulation run outputs
+environment/frontend_server/storage/bench-*/
+environment/frontend_server/storage/sim-*/
+environment/frontend_server/compressed_storage/sim-*/
+environment/frontend_server/temp_storage/curr_step.json
+reverie/backend_server/_benchmark.py
+nul

@@ -38,10 +38,10 @@ sys.modules["utils"] = _utils_stub
 _gpt_struct = types.ModuleType("persona.prompt_template.gpt_structure")
 
 def _get_embedding_stub(text, *args, **kwargs):
-    """ダミーembedding: テキスト長に基づく決定的ベクトルを返す"""
+    """ダミーembedding: テキスト長に基づく決定的ベクトルを返す（tuple）"""
     import hashlib
     h = hashlib.md5(text.encode()).hexdigest()
-    return [int(c, 16) / 15.0 for c in h[:10]]
+    return tuple(int(c, 16) / 15.0 for c in h[:10])
 
 _gpt_struct.get_embedding = _get_embedding_stub
 _gpt_struct.ChatGPT_request = lambda *a, **kw: ""

@@ -7,19 +7,42 @@ Description: Wrapper functions for calling OpenAI APIs.
 import json
 import random
 import openai
-import time 
+import openai.error
+import time
+from functools import lru_cache
 
 from utils import *
 
 openai.api_key = openai_api_key
 
 def temp_sleep(seconds=0.1):
-  time.sleep(seconds)
+  pass  # レート制限は_api_call_with_backoffで対応
+
+
+def _api_call_with_backoff(func, *args, max_retries=3, **kwargs):
+  """APIコールを指数バックオフ付きでリトライする。"""
+  for attempt in range(max_retries):
+    try:
+      return func(*args, **kwargs)
+    except openai.error.RateLimitError:
+      if attempt < max_retries - 1:
+        time.sleep(2 ** attempt)  # 1s, 2s, 4s
+      else:
+        raise
+    except (openai.error.AuthenticationError,
+            openai.error.InvalidRequestError):
+      raise
+    except Exception:
+      if attempt < max_retries - 1:
+        time.sleep(2 ** attempt)
+      else:
+        raise
 
 def ChatGPT_single_request(prompt):
   temp_sleep()
 
-  completion = openai.ChatCompletion.create(
+  completion = _api_call_with_backoff(
+    openai.ChatCompletion.create,
     model="gpt-4o-mini",
     messages=[{"role": "user", "content": prompt}]
   )
@@ -44,14 +67,15 @@ def GPT4_request(prompt):
   """
   temp_sleep()
 
-  try: 
-    completion = openai.ChatCompletion.create(
+  try:
+    completion = _api_call_with_backoff(
+    openai.ChatCompletion.create,
     model="gpt-4o",
     messages=[{"role": "user", "content": prompt}]
     )
     return completion["choices"][0]["message"]["content"]
-  
-  except: 
+
+  except:
     print ("ChatGPT ERROR")
     return "ChatGPT ERROR"
 
@@ -70,7 +94,8 @@ def ChatGPT_request(prompt):
   """
   # temp_sleep()
   try:
-    completion = openai.ChatCompletion.create(
+    completion = _api_call_with_backoff(
+    openai.ChatCompletion.create,
     model="gpt-4o-mini",
     messages=[{"role": "user", "content": prompt}]
     )
@@ -215,7 +240,8 @@ def GPT_request(prompt, gpt_parameter):
   """
   temp_sleep()
   try:
-    response = openai.ChatCompletion.create(
+    response = _api_call_with_backoff(
+                openai.ChatCompletion.create,
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=gpt_parameter["temperature"],
@@ -282,10 +308,16 @@ def safe_generate_response(prompt,
 
 def get_embedding(text, model="text-embedding-3-small"):
   text = text.replace("\n", " ")
-  if not text: 
+  if not text:
     text = "this is blank"
-  return openai.Embedding.create(
-          input=[text], model=model)['data'][0]['embedding']
+  return _get_embedding_cached(text, model)
+
+
+@lru_cache(maxsize=256)
+def _get_embedding_cached(text, model):
+  response = _api_call_with_backoff(
+      openai.Embedding.create, input=[text], model=model)
+  return tuple(response['data'][0]['embedding'])
 
 
 if __name__ == '__main__':

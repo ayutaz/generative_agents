@@ -6,9 +6,10 @@ Description: This defines the "Plan" module for generative agents.
 """
 import datetime
 import math
-import random 
+import random
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 sys.path.append('../../')
 
 from global_methods import *
@@ -423,14 +424,15 @@ def revise_identity(persona):
   plan_prompt += f" *{persona.scratch.curr_time.strftime('%A %B %d')}*? "
   plan_prompt += f"If there is any scheduling information, be as specific as possible (include date, time, and location if stated in the statement)\n\n"
   plan_prompt += f"Write the response from {p_name}'s perspective."
-  plan_note = ChatGPT_single_request(plan_prompt)
-  # print (plan_note)
-
   thought_prompt = statements + "\n"
   thought_prompt += f"Given the statements above, how might we summarize {p_name}'s feelings about their days up to now?\n\n"
   thought_prompt += f"Write the response from {p_name}'s perspective."
-  thought_note = ChatGPT_single_request(thought_prompt)
-  # print (thought_note)
+
+  with ThreadPoolExecutor(max_workers=2) as ex:
+    f_plan = ex.submit(ChatGPT_single_request, plan_prompt)
+    f_thought = ex.submit(ChatGPT_single_request, thought_prompt)
+    plan_note = f_plan.result()
+    thought_note = f_thought.result()
 
   currently_prompt = f"{p_name}'s status from {(persona.scratch.curr_time - datetime.timedelta(days=1)).strftime('%A %B %d')}:\n"
   currently_prompt += f"{persona.scratch.currently}\n\n"
@@ -622,20 +624,30 @@ def _determine_action(persona, maze):
   # Finding the target location of the action and creating action-related
   # variables.
   act_world = maze.access_tile(persona.scratch.curr_tile)["world"]
-  # act_sector = maze.access_tile(persona.scratch.curr_tile)["sector"]
-  act_sector = generate_action_sector(act_desp, persona, maze)
-  act_arena = generate_action_arena(act_desp, persona, maze, act_world, act_sector)
-  act_address = f"{act_world}:{act_sector}:{act_arena}"
-  act_game_object = generate_action_game_object(act_desp, act_address,
-                                                persona, maze)
-  new_address = f"{act_world}:{act_sector}:{act_arena}:{act_game_object}"
-  act_pron = generate_action_pronunciatio(act_desp, persona)
-  act_event = generate_action_event_triple(act_desp, persona)
-  # Persona's actions also influence the object states. We set those up here. 
-  act_obj_desp = generate_act_obj_desc(act_game_object, act_desp, persona)
-  act_obj_pron = generate_action_pronunciatio(act_obj_desp, persona)
-  act_obj_event = generate_act_obj_event_triple(act_game_object, 
-                                                act_obj_desp, persona)
+
+  with ThreadPoolExecutor(max_workers=3) as ex:
+    # act_pron, act_event depend only on act_desp → run in parallel
+    f_pron = ex.submit(generate_action_pronunciatio, act_desp, persona)
+    f_event = ex.submit(generate_action_event_triple, act_desp, persona)
+
+    # Dependency chain (sequential on main thread)
+    act_sector = generate_action_sector(act_desp, persona, maze)
+    act_arena = generate_action_arena(act_desp, persona, maze, act_world, act_sector)
+    act_address = f"{act_world}:{act_sector}:{act_arena}"
+    act_game_object = generate_action_game_object(act_desp, act_address,
+                                                  persona, maze)
+    new_address = f"{act_world}:{act_sector}:{act_arena}:{act_game_object}"
+    act_obj_desp = generate_act_obj_desc(act_game_object, act_desp, persona)
+
+    # After act_obj_desp is ready, submit remaining parallel calls
+    f_obj_pron = ex.submit(generate_action_pronunciatio, act_obj_desp, persona)
+    f_obj_event = ex.submit(generate_act_obj_event_triple,
+                            act_game_object, act_obj_desp, persona)
+
+    act_pron = f_pron.result()
+    act_event = f_event.result()
+    act_obj_pron = f_obj_pron.result()
+    act_obj_event = f_obj_event.result()
 
   # Adding the action to persona's queue. 
   persona.scratch.add_new_action(new_address, 
