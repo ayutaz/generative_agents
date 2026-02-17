@@ -44,6 +44,10 @@ Python 3.9.12で動作確認済みです。
 
     uv sync --extra analysis
 
+テスト実行用パッケージが必要な場合:
+
+    uv sync --extra test
+
 サーバー起動時は`uv run`プレフィックスを付けてください（例: `uv run python manage.py runserver`）。
 
 ## <img src="https://joonsungpark.s3.amazonaws.com:443/static/assets/characters/profile/Klaus_Mueller.png" alt="Generative Klaus">   シミュレーションの実行
@@ -96,6 +100,13 @@ OpenAIのAPIは、時間あたりのレート制限に達するとハングす�
 
 ## <img src="https://joonsungpark.s3.amazonaws.com:443/static/assets/characters/profile/Maria_Lopez.png" alt="Generative Maria">   シミュレーションの保存場所
 保存されたシミュレーションはすべて`environment/frontend_server/storage`に、圧縮済みデモはすべて`environment/frontend_server/compressed_storage`に配置されます。
+
+## テストの実行
+
+OpenAI APIを呼ばずにオフラインで実行可能なpytestテストスイートが含まれています。
+
+    uv sync --extra test
+    uv run pytest -v
 
 ## <img src="https://joonsungpark.s3.amazonaws.com:443/static/assets/characters/profile/Sam_Moore.png" alt="Generative Sam">   カスタマイズ
 

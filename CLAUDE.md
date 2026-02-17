@@ -13,6 +13,7 @@ Python 3.9.12で動作確認済み。
 ```bash
 uv sync                    # 基本依存のインストール
 uv sync --extra analysis   # 分析用パッケージも含める
+uv sync --extra test       # テスト用パッケージも含める
 ```
 
 APIキー設定ファイルは手動作成が必要（.gitignore対象）:
@@ -75,6 +76,26 @@ uv lock
 uv sync
 ```
 
+## テスト
+
+pytestベースのテストスイート。OpenAI APIを呼ばずにオフラインで実行可能。
+
+```bash
+uv sync --extra test       # テスト用パッケージのインストール
+uv run pytest -v           # 全テスト実行
+```
+
+テスト構成:
+- `tests/conftest.py` — `utils.py`・GPT関連モジュールのスタブ注入
+- `tests/test_path_finder.py` — パス探索アルゴリズム
+- `tests/test_global_methods.py` — ユーティリティ関数
+- `tests/test_scratch.py` — 作業記憶（Scratch）
+- `tests/test_spatial_memory.py` — 空間記憶（MemoryTree）
+- `tests/test_associative_memory.py` — 連想記憶（AssociativeMemory）
+- `tests/test_retrieve_pure.py` — 検索モジュールの純粋関数
+- `tests/test_reflect_triggers.py` — 内省トリガー
+- `tests/fixtures/` — テスト用フィクスチャJSON
+
 ## アーキテクチャ
 
 ### 2層構成
@@ -123,6 +144,7 @@ uv sync
 - gensim 3.8.0（embeddingによるメモリ検索）
 - numpy, scipy, scikit-learn（数値計算・類似度計算）
 - nltk（自然言語処理）
+- pytest（テストフレームワーク、optional `test` グループ）
 
 ## ベースシミュレーション
 
@@ -131,7 +153,7 @@ uv sync
 
 ## 注意事項
 
-- 自動テストフレームワーク・CI/CDパイプライン・リンター設定は未構築
+- CI/CDパイプライン・リンター設定は未構築
 - OpenAI APIのレート制限とコストに注意。頻繁な保存を推奨
 - `utils.py`はAPIキーを含むため.gitignore対象。絶対にコミットしない
 - フロントエンドのDjango SECRET_KEYはハードコードされている（開発用のみ）
