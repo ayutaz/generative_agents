@@ -33,8 +33,18 @@ debug = True
 ```
 `<Your OpenAI API>`をご自身のOpenAI APIキーに、`<Name>`をご自身の名前に置き換えてください。
 
-### Step 2. requirements.txtのインストール
-`requirements.txt`に記載されているパッケージをすべてインストールしてください（事前にvirtualenvを作成することを強く推奨します）。Pythonバージョンについて: Python 3.9.12で動作確認済みです。
+### Step 2. パッケージのインストール
+Python 3.9.12で動作確認済みです。
+
+[uv](https://docs.astral.sh/uv/)を使って依存関係をインストールします:
+
+    uv sync
+
+分析用パッケージ（gensim, scipy, scikit-learn等）も必要な場合:
+
+    uv sync --extra analysis
+
+サーバー起動時は`uv run`プレフィックスを付けてください（例: `uv run python manage.py runserver`）。
 
 ## <img src="https://joonsungpark.s3.amazonaws.com:443/static/assets/characters/profile/Klaus_Mueller.png" alt="Generative Klaus">   シミュレーションの実行
 新しいシミュレーションを実行するには、環境サーバーとエージェントシミュレーションサーバーの2つを同時に起動する必要があります。
