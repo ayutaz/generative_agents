@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 開発環境セットアップ
 
-Python 3.9.12で動作確認済み。
+Python 3.12で動作確認済み。
 
 ```bash
 uv sync                    # 基本依存のインストール
@@ -107,7 +107,7 @@ uv run pytest -v           # 全テスト実行
 ### 2層構成
 
 - **`reverie/`** — シミュレーションバックエンド（Pythonスクリプト）
-- **`environment/`** — WebフロントエンドUI（Django 2.2 + SQLite）
+- **`environment/`** — WebフロントエンドUI（Django 4.2 LTS + SQLite）
 
 ### エージェント（Persona）の構造
 
@@ -145,9 +145,9 @@ uv run pytest -v           # 全テスト実行
 
 ## 主要な依存関係
 
-- Django 2.2（Webフレームワーク）
+- Django 4.2 LTS（Webフレームワーク）
 - openai 0.27.0（GPT API、**v1.0未満必須** — legacy API使用）
-- gensim 3.8.0（embeddingによるメモリ検索）
+- gensim 4.x（embeddingによるメモリ検索）
 - numpy, scipy, scikit-learn（数値計算・類似度計算）
 - nltk（自然言語処理）
 - pytest（テストフレームワーク、optional `test` グループ）

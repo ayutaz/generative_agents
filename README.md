@@ -9,30 +9,20 @@
 このリポジトリは、研究論文「[Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)」に付属するものです。人間の行動を信憑性高くシミュレートする計算エージェント（Generative Agents）のコアシミュレーションモジュールと、そのゲーム環境を含んでいます。以下では、ローカルマシンでのシミュレーション環境の構築手順と、シミュレーションをデモアニメーションとしてリプレイする方法を説明します。
 
 ## <img src="https://joonsungpark.s3.amazonaws.com:443/static/assets/characters/profile/Isabella_Rodriguez.png" alt="Generative Isabella">   環境のセットアップ
-環境をセットアップするには、OpenAI APIキーを含む`utils.py`ファイルを生成し、必要なパッケージをインストールする必要があります。
+環境をセットアップするには、OpenAI APIキーを設定し、必要なパッケージをインストールする必要があります。
 
-### Step 1. utilsファイルの生成
-`reverie/backend_server`フォルダ（`reverie.py`が配置されている場所）に、`utils.py`という名前の新しいファイルを作成し、以下の内容をコピー＆ペーストしてください:
+### Step 1. APIキーの設定
+`.env.example`をコピーして`.env`ファイルを作成し、OpenAI APIキーを設定してください:
+```bash
+cp .env.example .env
 ```
-# OpenAI APIキーをコピー＆ペーストしてください
-openai_api_key = "<Your OpenAI API>"
-
-maze_assets_loc = "../../environment/frontend_server/static_dirs/assets"
-env_matrix = f"{maze_assets_loc}/the_ville/matrix"
-env_visuals = f"{maze_assets_loc}/the_ville/visuals"
-
-fs_storage = "../../environment/frontend_server/storage"
-fs_temp_storage = "../../environment/frontend_server/temp_storage"
-
-collision_block_id = "32125"
-
-# 詳細ログ出力
-debug = True
+`.env`ファイルを編集し、APIキーを入力します:
 ```
-`<Your OpenAI API>`をご自身のOpenAI APIキーに置き換えてください。
+OPENAI_API_KEY=<your-openai-api-key>
+```
 
 ### Step 2. パッケージのインストール
-Python 3.9.12で動作確認済みです。
+Python 3.12で動作確認済みです。
 
 [uv](https://docs.astral.sh/uv/)を使って依存関係をインストールします:
 
