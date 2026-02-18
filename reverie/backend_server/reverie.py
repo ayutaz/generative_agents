@@ -27,6 +27,7 @@ import math
 import os
 import shutil
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 
 from selenium import webdriver
 
@@ -367,18 +368,33 @@ class ReverieServer:
           # Then we need to actually have each of the personas perceive and
           # move. The movement for each of the personas comes in the form of
           # x y coordinates where the persona will move towards. e.g., (50, 34)
-          # This is where the core brains of the personas are invoked. 
-          movements = {"persona": dict(), 
+          # This is where the core brains of the personas are invoked.
+
+          # Phase A: Run perceive → retrieve → plan(action) → reflect
+          # in parallel for all personas. These operations only access each
+          # persona's own state and the maze (read-only), so they are
+          # thread-safe.
+          phase_a_results = {}
+          with ThreadPoolExecutor(
+              max_workers=min(len(self.personas), 8)) as executor:
+            futures = {}
+            for persona_name, persona in self.personas.items():
+              curr_tile = self.personas_tile[persona_name]
+              futures[persona_name] = executor.submit(
+                  persona.move_phase_a,
+                  self.maze, curr_tile, self.curr_time)
+            for persona_name, future in futures.items():
+              phase_a_results[persona_name] = future.result()
+
+          # Phase B: Run plan(reactions) → execute sequentially.
+          # These operations read/write other personas' state (e.g.,
+          # _should_react, _chat_react), so they must remain sequential.
+          movements = {"persona": dict(),
                        "meta": dict()}
-          for persona_name, persona in self.personas.items(): 
-            # <next_tile> is a x,y coordinate. e.g., (58, 9)
-            # <pronunciatio> is an emoji. e.g., "\ud83d\udca4"
-            # <description> is a string description of the movement. e.g., 
-            #   writing her next novel (editing her novel) 
-            #   @ double studio:double studio:common room:sofa
-            next_tile, pronunciatio, description = persona.move(
-              self.maze, self.personas, self.personas_tile[persona_name], 
-              self.curr_time)
+          for persona_name, persona in self.personas.items():
+            new_day, retrieved = phase_a_results[persona_name]
+            next_tile, pronunciatio, description = persona.move_phase_b(
+              self.maze, self.personas, retrieved)
             movements["persona"][persona_name] = {}
             movements["persona"][persona_name]["movement"] = next_tile
             movements["persona"][persona_name]["pronunciatio"] = pronunciatio
@@ -408,8 +424,89 @@ class ReverieServer:
 
           int_counter -= 1
           
-      # Sleep so we don't burn our machines. 
+      # Sleep so we don't burn our machines.
       time.sleep(self.server_sleep)
+
+
+  def start_server_headless(self, n_steps):
+    """
+    Run n_steps of simulation without frontend synchronization.
+    Bypasses file I/O polling for maximum speed. Useful for batch
+    processing and experiments.
+
+    INPUT
+      n_steps: Number of simulation steps to execute.
+    OUTPUT
+      None
+    """
+    game_obj_cleanup = dict()
+
+    for step in range(n_steps):
+      # Clean up object actions from previous cycle
+      for key, val in game_obj_cleanup.items():
+        self.maze.turn_event_from_tile_idle(key, val)
+      game_obj_cleanup = dict()
+
+      # Update maze state for each persona (no frontend file read)
+      for persona_name, persona in self.personas.items():
+        curr_tile = self.personas_tile[persona_name]
+        # In headless mode, new_tile is the same as curr_tile
+        # (the persona hasn't been moved by the frontend)
+        new_tile = curr_tile
+
+        self.maze.remove_subject_events_from_tile(persona.name, curr_tile)
+        self.maze.add_event_from_tile(persona.scratch
+                                     .get_curr_event_and_desc(), new_tile)
+
+        if not persona.scratch.planned_path:
+          game_obj_cleanup[persona.scratch
+                           .get_curr_obj_event_and_desc()] = new_tile
+          self.maze.add_event_from_tile(persona.scratch
+                                 .get_curr_obj_event_and_desc(), new_tile)
+          blank = (persona.scratch.get_curr_obj_event_and_desc()[0],
+                   None, None, None)
+          self.maze.remove_event_from_tile(blank, new_tile)
+
+      # Phase A: parallel cognitive processing
+      phase_a_results = {}
+      with ThreadPoolExecutor(
+          max_workers=min(len(self.personas), 8)) as executor:
+        futures = {}
+        for persona_name, persona in self.personas.items():
+          curr_tile = self.personas_tile[persona_name]
+          futures[persona_name] = executor.submit(
+              persona.move_phase_a,
+              self.maze, curr_tile, self.curr_time)
+        for persona_name, future in futures.items():
+          phase_a_results[persona_name] = future.result()
+
+      # Phase B: sequential reaction processing + execution
+      for persona_name, persona in self.personas.items():
+        new_day, retrieved = phase_a_results[persona_name]
+        next_tile, pronunciatio, description = persona.move_phase_b(
+            self.maze, self.personas, retrieved)
+
+        # Apply movement directly (no JSON file output)
+        old_tile = self.personas_tile[persona_name]
+        self.personas_tile[persona_name] = next_tile
+        self.maze.remove_subject_events_from_tile(persona.name, old_tile)
+        self.maze.add_event_from_tile(persona.scratch
+                                     .get_curr_event_and_desc(), next_tile)
+
+      # Advance time
+      self.step += 1
+      self.curr_time += datetime.timedelta(seconds=self.sec_per_step)
+
+      # Periodic save and progress report
+      if (step + 1) % 100 == 0:
+        print(f"  Headless step {step + 1}/{n_steps} "
+              f"(time: {self.curr_time.strftime('%B %d, %Y, %H:%M:%S')})")
+        self.save()
+
+    # Final save
+    self.save()
+    print(f"Headless run complete: {n_steps} steps. "
+          f"Current time: {self.curr_time.strftime('%B %d, %Y, %H:%M:%S')}")
 
 
   def open_server(self): 
@@ -461,11 +558,19 @@ class ReverieServer:
           # Example: save
           self.save()
 
-        elif sim_command[:3].lower() == "run": 
+        elif sim_command[:3].lower() == "run":
           # Runs the number of steps specified in the prompt.
           # Example: run 1000
           int_count = int(sim_command.split()[-1])
           rs.start_server(int_count)
+
+        elif sim_command[:8].lower() == "headless":
+          # Runs simulation steps without frontend synchronization.
+          # Bypasses file I/O for maximum speed.
+          # Example: headless 1000
+          int_count = int(sim_command.split()[-1])
+          print(f"Starting headless run: {int_count} steps...")
+          self.start_server_headless(int_count)
 
         elif ("print persona schedule" 
               in sim_command[:22].lower()): 

@@ -306,18 +306,68 @@ def safe_generate_response(prompt,
   return fail_safe_response
 
 
+_EMBEDDING_DICT_CACHE = {}
+
+
 def get_embedding(text, model="text-embedding-3-small"):
   text = text.replace("\n", " ")
   if not text:
     text = "this is blank"
-  return _get_embedding_cached(text, model)
+  emb = _get_embedding_cached(text, model)
+  # Also populate the dict cache used by get_embeddings_batch
+  _EMBEDDING_DICT_CACHE[(text, model)] = emb
+  return emb
 
 
-@lru_cache(maxsize=256)
+@lru_cache(maxsize=4096)
 def _get_embedding_cached(text, model):
   response = _api_call_with_backoff(
       openai.Embedding.create, input=[text], model=model)
   return tuple(response['data'][0]['embedding'])
+
+
+def get_embeddings_batch(texts, model="text-embedding-3-small"):
+  """Get embeddings for multiple texts in a single API call.
+
+  Uses a dict cache (_EMBEDDING_DICT_CACHE) shared with the lru_cache.
+  Cached texts are returned immediately; uncached texts are batched into
+  a single openai.Embedding.create call.
+
+  INPUT:
+    texts: list of strings to embed
+    model: embedding model name
+  OUTPUT:
+    list of embedding tuples, same order as input texts
+  """
+  if not texts:
+    return []
+
+  cleaned = [t.replace("\n", " ") or "this is blank" for t in texts]
+
+  # Separate cached from uncached
+  results = {}
+  uncached = []
+  uncached_indices = []
+  for i, text in enumerate(cleaned):
+    cache_key = (text, model)
+    if cache_key in _EMBEDDING_DICT_CACHE:
+      results[i] = _EMBEDDING_DICT_CACHE[cache_key]
+    else:
+      uncached.append(text)
+      uncached_indices.append(i)
+
+  # Single batch API call for all uncached texts
+  if uncached:
+    response = _api_call_with_backoff(
+        openai.Embedding.create, input=uncached, model=model)
+    for j, item in enumerate(response['data']):
+      emb = tuple(item['embedding'])
+      idx = uncached_indices[j]
+      results[idx] = emb
+      # Store in dict cache for future batch calls
+      _EMBEDDING_DICT_CACHE[(uncached[j], model)] = emb
+
+  return [results[i] for i in range(len(texts))]
 
 
 if __name__ == '__main__':

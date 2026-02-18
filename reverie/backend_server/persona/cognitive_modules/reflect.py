@@ -112,23 +112,33 @@ def run_reflect(persona):
   # <retrieved> has keys of focal points, and values of the associated Nodes. 
   retrieved = new_retrieve(persona, focal_points)
 
-  # For each of the focal points, generate thoughts and save it in the 
-  # agent's memory. 
-  for focal_pt, nodes in retrieved.items(): 
+  # For each of the focal points, generate thoughts and save it in the
+  # agent's memory.
+  for focal_pt, nodes in retrieved.items():
     xx = [i.embedding_key for i in nodes]
     for xxx in xx: print (xxx)
 
     thoughts = generate_insights_and_evidence(persona, nodes, 5)
-    for thought, evidence in thoughts.items(): 
+
+    # Batch-fetch embeddings for all thoughts at once
+    thought_texts = list(thoughts.keys())
+    if thought_texts:
+      thought_embeddings = get_embeddings_batch(thought_texts)
+      thought_embed_map = dict(zip(thought_texts, thought_embeddings))
+    else:
+      thought_embed_map = {}
+
+    for thought, evidence in thoughts.items():
       created = persona.scratch.curr_time
       expiration = persona.scratch.curr_time + datetime.timedelta(days=30)
       s, p, o = generate_action_event_triple(thought, persona)
       keywords = set([s, p, o])
       thought_poignancy = generate_poig_score(persona, "thought", thought)
-      thought_embedding_pair = (thought, get_embedding(thought))
+      thought_embedding_pair = (thought, thought_embed_map.get(thought,
+                                          get_embedding(thought)))
 
-      persona.a_mem.add_thought(created, expiration, s, p, o, 
-                                thought, keywords, thought_poignancy, 
+      persona.a_mem.add_thought(created, expiration, s, p, o,
+                                thought, keywords, thought_poignancy,
                                 thought_embedding_pair, evidence)
 
 

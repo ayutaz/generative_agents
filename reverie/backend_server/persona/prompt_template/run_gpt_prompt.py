@@ -281,13 +281,90 @@ def run_gpt_prompt_generate_hourly_schedule(persona,
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
   
-  if debug or verbose: 
-    print_run_prompts(prompt_template, persona, gpt_param, 
+  if debug or verbose:
+    print_run_prompts(prompt_template, persona, gpt_param,
                       prompt_input, prompt, output)
-    
+
   return output, [output, prompt, gpt_param, prompt_input, fail_safe]
 
 
+def run_gpt_prompt_generate_hourly_schedule_batch(persona,
+                                                   remaining_hours,
+                                                   hour_str,
+                                                   test_input=None,
+                                                   verbose=False):
+  """Generate all remaining hourly activities in a single GPT call."""
+  def create_prompt_input(persona, remaining_hours, hour_str, test_input=None):
+    if test_input: return test_input
+
+    daily_plan_str = ""
+    for count, i in enumerate(persona.scratch.daily_req):
+      daily_plan_str += f"{str(count+1)}) {i}, "
+    daily_plan_str = daily_plan_str[:-2]
+
+    hours_format = ""
+    for h in remaining_hours:
+      hours_format += f"[{persona.scratch.get_str_curr_date_str()} -- {h}]\n"
+    hours_format = hours_format.strip()
+
+    prompt_input = []
+    prompt_input += [persona.scratch.get_str_iss()]
+    prompt_input += [daily_plan_str]
+    prompt_input += [hours_format]
+    prompt_input += [persona.scratch.get_str_firstname()]
+    return prompt_input
+
+  def __func_clean_up(gpt_response, prompt=""):
+    activities = []
+    for line in gpt_response.strip().split("\n"):
+      line = line.strip()
+      if not line:
+        continue
+      # Strip leading numbering like "1." or "1)"
+      if len(line) > 2 and (line[0].isdigit() and line[1] in ".)" or
+                             line[:2].isdigit() and len(line) > 3 and line[2] in ".)"):
+        line = line.split(".", 1)[-1].strip() if "." in line[:3] else line.split(")", 1)[-1].strip()
+      if line.endswith("."):
+        line = line[:-1]
+      activities.append(line)
+    return activities
+
+  def __func_validate(gpt_response, prompt=""):
+    try:
+      result = __func_clean_up(gpt_response, prompt)
+      if len(result) < 1:
+        return False
+      return True
+    except:
+      return False
+
+  def get_fail_safe(n_hours):
+    return ["idle"] * n_hours
+
+  n_remaining = len(remaining_hours)
+
+  gpt_param = {"engine": "gpt-4o-mini", "max_tokens": 500,
+               "temperature": 0.5, "top_p": 1, "stream": False,
+               "frequency_penalty": 0, "presence_penalty": 0, "stop": None}
+  prompt_template = "persona/prompt_template/v2/generate_hourly_schedule_batch_v1.txt"
+  prompt_input = create_prompt_input(persona, remaining_hours, hour_str, test_input)
+  prompt = generate_prompt(prompt_input, prompt_template)
+  fail_safe = get_fail_safe(n_remaining)
+
+  output = safe_generate_response(prompt, gpt_param, 3, fail_safe,
+                                   __func_validate, __func_clean_up)
+
+  # Ensure output has exactly n_remaining items
+  if output and len(output) < n_remaining:
+    output = output + ["idle"] * (n_remaining - len(output))
+  elif output and len(output) > n_remaining:
+    output = output[:n_remaining]
+
+  if debug or verbose:
+    print_run_prompts(prompt_template, persona, gpt_param,
+                      prompt_input, prompt, output)
+
+  return output, [output, prompt, gpt_param, prompt_input, fail_safe]
 
 
 

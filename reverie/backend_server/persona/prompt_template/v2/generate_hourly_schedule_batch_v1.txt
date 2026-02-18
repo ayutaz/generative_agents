@@ -1,0 +1,18 @@
+generate_hourly_schedule_batch_v1.txt
+
+Variables:
+!<INPUT 0>! -- Commonset (identity stable set)
+!<INPUT 1>! -- Daily plan
+!<INPUT 2>! -- Remaining hours list with format
+!<INPUT 3>! -- Persona first name
+
+<commentblockmarker>###</commentblockmarker>
+!<INPUT 0>!
+
+Here is !<INPUT 3>!'s plan for today in broad strokes: !<INPUT 1>!
+
+Create an hourly activity schedule for !<INPUT 3>! for the following hours. For each hour, write what !<INPUT 3>! is doing in a few words (e.g., "sleeping", "eating breakfast", "working on painting"). The activity should complete the phrase "!<INPUT 3>! is..."
+
+!<INPUT 2>!
+
+Write ONLY the activities separated by newlines, one per hour, in the same order as above. Do not include the hour labels or any other text.

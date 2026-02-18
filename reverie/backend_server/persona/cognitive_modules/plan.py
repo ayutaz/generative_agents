@@ -69,71 +69,70 @@ def generate_first_daily_plan(persona, wake_up_hour):
   return run_gpt_prompt_daily_plan(persona, wake_up_hour)[0]
 
 
-def generate_hourly_schedule(persona, wake_up_hour): 
+def generate_hourly_schedule(persona, wake_up_hour):
   """
-  Based on the daily req, creates an hourly schedule -- one hour at a time. 
-  The form of the action for each of the hour is something like below: 
+  Based on the daily req, creates an hourly schedule -- one hour at a time.
+  The form of the action for each of the hour is something like below:
   "sleeping in her bed"
-  
+
   The output is basically meant to finish the phrase, "x is..."
 
   Persona state: identity stable set, daily_plan
 
-  INPUT: 
-    persona: The Persona class instance 
-    persona: Integer form of the wake up hour for the persona.  
-  OUTPUT: 
-    a list of activities and their duration in minutes: 
-  EXAMPLE OUTPUT: 
-    [['sleeping', 360], ['waking up and starting her morning routine', 60], 
+  INPUT:
+    persona: The Persona class instance
+    persona: Integer form of the wake up hour for the persona.
+  OUTPUT:
+    a list of activities and their duration in minutes:
+  EXAMPLE OUTPUT:
+    [['sleeping', 360], ['waking up and starting her morning routine', 60],
      ['eating breakfast', 60],..
   """
   if debug: print ("GNS FUNCTION: <generate_hourly_schedule>")
 
-  hour_str = ["00:00 AM", "01:00 AM", "02:00 AM", "03:00 AM", "04:00 AM", 
-              "05:00 AM", "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM", 
-              "10:00 AM", "11:00 AM", "12:00 PM", "01:00 PM", "02:00 PM", 
+  hour_str = ["00:00 AM", "01:00 AM", "02:00 AM", "03:00 AM", "04:00 AM",
+              "05:00 AM", "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM",
+              "10:00 AM", "11:00 AM", "12:00 PM", "01:00 PM", "02:00 PM",
               "03:00 PM", "04:00 PM", "05:00 PM", "06:00 PM", "07:00 PM",
               "08:00 PM", "09:00 PM", "10:00 PM", "11:00 PM"]
-  n_m1_activity = []
+
+  # Sleeping hours before wake_up_hour
+  n_m1_activity = ["sleeping"] * wake_up_hour
+
+  # Batch approach: generate all remaining hours in one GPT call
+  remaining_hours = hour_str[wake_up_hour:]
   diversity_repeat_count = 3
-  for i in range(diversity_repeat_count): 
-    n_m1_activity_set = set(n_m1_activity)
-    if len(n_m1_activity_set) < 5: 
-      n_m1_activity = []
-      for count, curr_hour_str in enumerate(hour_str): 
-        if wake_up_hour > 0: 
-          n_m1_activity += ["sleeping"]
-          wake_up_hour -= 1
-        else: 
-          n_m1_activity += [run_gpt_prompt_generate_hourly_schedule(
-                          persona, curr_hour_str, n_m1_activity, hour_str)[0]]
-  
-  # Step 1. Compressing the hourly schedule to the following format: 
-  # The integer indicates the number of hours. They should add up to 24. 
-  # [['sleeping', 6], ['waking up and starting her morning routine', 1], 
-  # ['eating breakfast', 1], ['getting ready for the day', 1], 
-  # ['working on her painting', 2], ['taking a break', 1], 
-  # ['having lunch', 1], ['working on her painting', 3], 
-  # ['taking a break', 2], ['working on her painting', 2], 
+  for i in range(diversity_repeat_count):
+    if len(set(n_m1_activity)) < 5 or i == 0:
+      activities = run_gpt_prompt_generate_hourly_schedule_batch(
+          persona, remaining_hours, hour_str)[0]
+      n_m1_activity = ["sleeping"] * wake_up_hour + activities
+
+  # Step 1. Compressing the hourly schedule to the following format:
+  # The integer indicates the number of hours. They should add up to 24.
+  # [['sleeping', 6], ['waking up and starting her morning routine', 1],
+  # ['eating breakfast', 1], ['getting ready for the day', 1],
+  # ['working on her painting', 2], ['taking a break', 1],
+  # ['having lunch', 1], ['working on her painting', 3],
+  # ['taking a break', 2], ['working on her painting', 2],
   # ['relaxing and watching TV', 1], ['going to bed', 1], ['sleeping', 2]]
   _n_m1_hourly_compressed = []
-  prev = None 
+  prev = None
   prev_count = 0
-  for i in n_m1_activity: 
+  for i in n_m1_activity:
     if i != prev:
-      prev_count = 1 
+      prev_count = 1
       _n_m1_hourly_compressed += [[i, prev_count]]
       prev = i
-    else: 
-      if _n_m1_hourly_compressed: 
+    else:
+      if _n_m1_hourly_compressed:
         _n_m1_hourly_compressed[-1][1] += 1
 
   # Step 2. Expand to min scale (from hour scale)
-  # [['sleeping', 360], ['waking up and starting her morning routine', 60], 
+  # [['sleeping', 360], ['waking up and starting her morning routine', 60],
   # ['eating breakfast', 60],..
   n_m1_hourly_compressed = []
-  for task, duration in _n_m1_hourly_compressed: 
+  for task, duration in _n_m1_hourly_compressed:
     n_m1_hourly_compressed += [[task, duration*60]]
 
   return n_m1_hourly_compressed
@@ -940,83 +939,109 @@ def _wait_react(persona, reaction_mode):
     act_pronunciatio, act_obj_description, act_obj_pronunciatio, act_obj_event)
 
 
-def plan(persona, maze, personas, new_day, retrieved): 
+def plan_action_only(persona, maze, new_day):
   """
-  Main cognitive function of the chain. It takes the retrieved memory and 
-  perception, as well as the maze and the first day state to conduct both 
-  the long term and short term planning for the persona. 
+  Phase A: Self-contained planning. Only accesses the persona's own state
+  and the maze (read-only). Safe for parallel execution across personas.
 
-  INPUT: 
-    maze: Current <Maze> instance of the world. 
-    personas: A dictionary that contains all persona names as keys, and the 
-              Persona instance as values. 
-    new_day: This can take one of the three values. 
-      1) <Boolean> False -- It is not a "new day" cycle (if it is, we would
-         need to call the long term planning sequence for the persona). 
-      2) <String> "First day" -- It is literally the start of a simulation,
-         so not only is it a new day, but also it is the first day. 
-      2) <String> "New day" -- It is a new day. 
-    retrieved: dictionary of dictionary. The first layer specifies an event,
-               while the latter layer specifies the "curr_event", "events", 
-               and "thoughts" that are relevant.
-  OUTPUT 
-    The target action address of the persona (persona.scratch.act_address).
-  """ 
-  # PART 1: Generate the hourly schedule. 
-  if new_day: 
+  Handles:
+    PART 1: Long-term planning (daily schedule generation)
+    PART 2: Action determination (next action from schedule)
+  """
+  # PART 1: Generate the hourly schedule.
+  if new_day:
     _long_term_planning(persona, new_day)
 
   # PART 2: If the current action has expired, we want to create a new plan.
-  if persona.scratch.act_check_finished(): 
+  if persona.scratch.act_check_finished():
     _determine_action(persona, maze)
 
-  # PART 3: If you perceived an event that needs to be responded to (saw 
-  # another persona), and retrieved relevant information. 
-  # Step 1: Retrieved may have multiple events represented in it. The first 
-  #         job here is to determine which of the events we want to focus 
-  #         on for the persona. 
-  #         <focused_event> takes the form of a dictionary like this: 
-  #         dictionary {["curr_event"] = <ConceptNode>, 
-  #                     ["events"] = [<ConceptNode>, ...], 
+
+def plan_react_only(persona, maze, personas, retrieved):
+  """
+  Phase B: Reaction planning. Reads other personas' state, so must run
+  sequentially across personas.
+
+  Handles:
+    PART 3: Reaction to perceived events (chat, wait, etc.)
+    Chat state cleanup and buffer management
+
+  OUTPUT
+    The target action address of the persona (persona.scratch.act_address).
+  """
+  # PART 3: If you perceived an event that needs to be responded to (saw
+  # another persona), and retrieved relevant information.
+  # Step 1: Retrieved may have multiple events represented in it. The first
+  #         job here is to determine which of the events we want to focus
+  #         on for the persona.
+  #         <focused_event> takes the form of a dictionary like this:
+  #         dictionary {["curr_event"] = <ConceptNode>,
+  #                     ["events"] = [<ConceptNode>, ...],
   #                     ["thoughts"] = [<ConceptNode>, ...]}
   focused_event = False
-  if retrieved.keys(): 
+  if retrieved.keys():
     focused_event = _choose_retrieved(persona, retrieved)
-  
+
   # Step 2: Once we choose an event, we need to determine whether the
   #         persona will take any actions for the perceived event. There are
-  #         three possible modes of reaction returned by _should_react. 
+  #         three possible modes of reaction returned by _should_react.
   #         a) "chat with {target_persona.name}"
   #         b) "react"
   #         c) False
-  if focused_event: 
+  if focused_event:
     reaction_mode = _should_react(persona, focused_event, personas)
-    if reaction_mode: 
-      # If we do want to chat, then we generate conversation 
+    if reaction_mode:
+      # If we do want to chat, then we generate conversation
       if reaction_mode[:9] == "chat with":
         _chat_react(maze, persona, focused_event, reaction_mode, personas)
-      elif reaction_mode[:4] == "wait": 
+      elif reaction_mode[:4] == "wait":
         _wait_react(persona, reaction_mode)
-      # elif reaction_mode == "do other things": 
+      # elif reaction_mode == "do other things":
       #   _chat_react(persona, focused_event, reaction_mode, personas)
 
-  # Step 3: Chat-related state clean up. 
-  # If the persona is not chatting with anyone, we clean up any of the 
-  # chat-related states here. 
+  # Step 3: Chat-related state clean up.
+  # If the persona is not chatting with anyone, we clean up any of the
+  # chat-related states here.
   if persona.scratch.act_event[1] != "chat with":
     persona.scratch.chatting_with = None
     persona.scratch.chat = None
     persona.scratch.chatting_end_time = None
   # We want to make sure that the persona does not keep conversing with each
-  # other in an infinite loop. So, chatting_with_buffer maintains a form of 
-  # buffer that makes the persona wait from talking to the same target 
-  # immediately after chatting once. We keep track of the buffer value here. 
+  # other in an infinite loop. So, chatting_with_buffer maintains a form of
+  # buffer that makes the persona wait from talking to the same target
+  # immediately after chatting once. We keep track of the buffer value here.
   curr_persona_chat_buffer = persona.scratch.chatting_with_buffer
-  for persona_name, buffer_count in curr_persona_chat_buffer.items():
-    if persona_name != persona.scratch.chatting_with: 
-      persona.scratch.chatting_with_buffer[persona_name] -= 1
+  for p_name, buffer_count in list(curr_persona_chat_buffer.items()):
+    if p_name != persona.scratch.chatting_with:
+      persona.scratch.chatting_with_buffer[p_name] -= 1
 
   return persona.scratch.act_address
+
+
+def plan(persona, maze, personas, new_day, retrieved):
+  """
+  Main cognitive function of the chain. It takes the retrieved memory and
+  perception, as well as the maze and the first day state to conduct both
+  the long term and short term planning for the persona.
+
+  INPUT:
+    maze: Current <Maze> instance of the world.
+    personas: A dictionary that contains all persona names as keys, and the
+              Persona instance as values.
+    new_day: This can take one of the three values.
+      1) <Boolean> False -- It is not a "new day" cycle (if it is, we would
+         need to call the long term planning sequence for the persona).
+      2) <String> "First day" -- It is literally the start of a simulation,
+         so not only is it a new day, but also it is the first day.
+      2) <String> "New day" -- It is a new day.
+    retrieved: dictionary of dictionary. The first layer specifies an event,
+               while the latter layer specifies the "curr_event", "events",
+               and "thoughts" that are relevant.
+  OUTPUT
+    The target action address of the persona (persona.scratch.act_address).
+  """
+  plan_action_only(persona, maze, new_day)
+  return plan_react_only(persona, maze, personas, retrieved)
 
 
 

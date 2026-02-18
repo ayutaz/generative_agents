@@ -182,53 +182,82 @@ class Persona:
     reflect(self)
 
 
-  def move(self, maze, personas, curr_tile, curr_time):
+  def move_phase_a(self, maze, curr_tile, curr_time):
     """
-    This is the main cognitive function where our main sequence is called. 
+    Phase A: Parallel-safe cognitive pipeline. Only accesses this persona's
+    own state and the maze (read-only).
 
-    INPUT: 
-      maze: The Maze class of the current world. 
-      personas: A dictionary that contains all persona names as keys, and the 
-                Persona instance as values. 
-      curr_tile: A tuple that designates the persona's current tile location 
+    Runs: perceive → retrieve → plan(PART1+2) → reflect
+
+    INPUT:
+      maze: The Maze class of the current world.
+      curr_tile: A tuple that designates the persona's current tile location
                  in (row, col) form. e.g., (58, 39)
-      curr_time: datetime instance that indicates the game's current time. 
-    OUTPUT: 
-      execution: A triple set that contains the following components: 
-        <next_tile> is a x,y coordinate. e.g., (58, 9)
-        <pronunciatio> is an emoji.
-        <description> is a string description of the movement. e.g., 
-        writing her next novel (editing her novel) 
-        @ double studio:double studio:common room:sofa
+      curr_time: datetime instance that indicates the game's current time.
+    OUTPUT:
+      (new_day, retrieved): Intermediate results needed by move_phase_b.
     """
-    # Updating persona's scratch memory with <curr_tile>. 
+    # Updating persona's scratch memory with <curr_tile>.
     self.scratch.curr_tile = curr_tile
 
-    # We figure out whether the persona started a new day, and if it is a new
-    # day, whether it is the very first day of the simulation. This is 
-    # important because we set up the persona's long term plan at the start of
-    # a new day. 
+    # Determine if new day started.
     new_day = False
-    if not self.scratch.curr_time: 
+    if not self.scratch.curr_time:
       new_day = "First day"
     elif (self.scratch.curr_time.strftime('%A %B %d')
           != curr_time.strftime('%A %B %d')):
       new_day = "New day"
     self.scratch.curr_time = curr_time
 
-    # Main cognitive sequence begins here. 
+    # Phase A cognitive sequence: perceive → retrieve → plan(action) → reflect
     perceived = self.perceive(maze)
     retrieved = self.retrieve(perceived)
-    plan = self.plan(maze, personas, new_day, retrieved)
+    plan_action_only(self, maze, new_day)
     self.reflect()
 
-    # <execution> is a triple set that contains the following components: 
-    # <next_tile> is a x,y coordinate. e.g., (58, 9)
-    # <pronunciatio> is an emoji. e.g., "\ud83d\udca4"
-    # <description> is a string description of the movement. e.g., 
-    #   writing her next novel (editing her novel) 
-    #   @ double studio:double studio:common room:sofa
-    return self.execute(maze, personas, plan)
+    return new_day, retrieved
+
+
+  def move_phase_b(self, maze, personas, retrieved):
+    """
+    Phase B: Sequential execution. Reads other personas' state for reaction
+    processing and pathfinding.
+
+    Runs: plan(PART3: reactions) → execute
+
+    INPUT:
+      maze: The Maze class of the current world.
+      personas: A dictionary that contains all persona names as keys, and the
+                Persona instance as values.
+      retrieved: dictionary of retrieved memories from Phase A.
+    OUTPUT:
+      execution: A triple set (next_tile, pronunciatio, description).
+    """
+    act_address = plan_react_only(self, maze, personas, retrieved)
+    return self.execute(maze, personas, act_address)
+
+
+  def move(self, maze, personas, curr_tile, curr_time):
+    """
+    This is the main cognitive function where our main sequence is called.
+
+    INPUT:
+      maze: The Maze class of the current world.
+      personas: A dictionary that contains all persona names as keys, and the
+                Persona instance as values.
+      curr_tile: A tuple that designates the persona's current tile location
+                 in (row, col) form. e.g., (58, 39)
+      curr_time: datetime instance that indicates the game's current time.
+    OUTPUT:
+      execution: A triple set that contains the following components:
+        <next_tile> is a x,y coordinate. e.g., (58, 9)
+        <pronunciatio> is an emoji.
+        <description> is a string description of the movement. e.g.,
+        writing her next novel (editing her novel)
+        @ double studio:double studio:common room:sofa
+    """
+    new_day, retrieved = self.move_phase_a(maze, curr_tile, curr_time)
+    return self.move_phase_b(maze, personas, retrieved)
 
 
   def open_convo_session(self, convo_mode): 
