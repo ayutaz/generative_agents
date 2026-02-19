@@ -113,5 +113,8 @@ environment/frontend_server/storage/bench-*/
 environment/frontend_server/storage/sim-*/
 environment/frontend_server/compressed_storage/sim-*/
 environment/frontend_server/temp_storage/curr_step.json
+environment/frontend_server/temp_storage/curr_sim_code.json
+environment/frontend_server/db.sqlite3.bak
+environment/frontend_server/storage/test_run*/
 reverie/backend_server/_benchmark.py
 nul
