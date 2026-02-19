@@ -26,6 +26,7 @@ import time
 import math
 import os
 import shutil
+import sys
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 
@@ -527,8 +528,13 @@ class ReverieServer:
     # <sim_folder> points to the current simulation folder.
     sim_folder = f"{fs_storage}/{self.sim_code}"
 
-    while True: 
-      sim_command = input("Enter option: ")
+    while True:
+      try:
+        sim_command = input("Enter option: ")
+      except EOFError:
+        print("\nEnd of input. Saving and exiting.")
+        self.save()
+        break
       sim_command = sim_command.strip()
       ret_str = ""
 
@@ -562,7 +568,7 @@ class ReverieServer:
           # Runs the number of steps specified in the prompt.
           # Example: run 1000
           int_count = int(sim_command.split()[-1])
-          rs.start_server(int_count)
+          self.start_server(int_count)
 
         elif sim_command[:8].lower() == "headless":
           # Runs simulation steps without frontend synchronization.
@@ -710,8 +716,12 @@ if __name__ == '__main__':
   #                    "July1_the_ville_isabella_maria_klaus-step-3-21")
   # rs.open_server()
 
-  origin = input("Enter the name of the forked simulation: ").strip()
-  target = input("Enter the name of the new simulation: ").strip()
+  try:
+    origin = input("Enter the name of the forked simulation: ").strip()
+    target = input("Enter the name of the new simulation: ").strip()
+  except EOFError:
+    print("No input provided. Exiting.")
+    sys.exit(1)
 
   rs = ReverieServer(origin, target)
   rs.open_server()
